@@ -44,7 +44,6 @@ def scheduled_user_management():
     """Scheduled job to add and remove users"""
     db = SessionLocal()
     try:
-        # Add random number of users (1-7)
         users_to_add = random.randint(1, 7)
         added_count = 0
 
@@ -54,18 +53,15 @@ def scheduled_user_management():
             if user_id:
                 added_count += 1
 
-        # Delete random number of oldest users (1-3)
         users_to_delete = random.randint(1, 3)
         oldest_users = db.query(User).order_by(User.created_at.asc()).limit(users_to_delete).all()
 
         deleted_count = 0
         for user in oldest_users:
             try:
-                # Delete related records first
                 db.query(Address).filter(Address.user_id == user.id).delete()
                 db.query(CreditCard).filter(CreditCard.user_id == user.id).delete()
 
-                # Delete user
                 db.delete(user)
                 deleted_count += 1
             except Exception as e:
@@ -94,9 +90,9 @@ async def lifespan(app: FastAPI):
 
     scheduler.add_job(
         scheduled_user_management,
-        trigger=IntervalTrigger(minutes=1),
+        trigger=IntervalTrigger(minutes=5),
         id='user_management',
-        name='Add and remove users every minute',
+        name='Add and remove users every 5 minutes',
         replace_existing=True
     )
     scheduler.start()
