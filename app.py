@@ -34,7 +34,7 @@ def initialize_users():
         user_count = db.query(User).count()
         if user_count == 0:
             logger.info("Database is empty, generating initial test users...")
-            generate_test_users(3000)
+            generate_test_users(1000)
         else:
             logger.info(f"Database already contains {user_count} users, skipping initialization")
     finally:
