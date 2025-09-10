@@ -1,3 +1,4 @@
+import os
 import random
 from contextlib import asynccontextmanager
 
@@ -34,7 +35,7 @@ def initialize_users():
         user_count = db.query(User).count()
         if user_count == 0:
             logger.info("Database is empty, generating initial test users...")
-            generate_test_users(1000)
+            generate_test_users(int(os.getenv('USERS_NUMBER', 1000)))
         else:
             logger.info(f"Database already contains {user_count} users, skipping initialization")
     finally:
@@ -143,6 +144,7 @@ class UserCreate(BaseModel):
     gender: str
     company: Optional[str] = None
     salary: Optional[float] = None
+    about_me: Optional[str] = None
     credit_card: CreditCardModel
 
     @validator('gender')
@@ -268,7 +270,7 @@ def get_user_with_details(db: Session, user_id: int):
     }
 
 @app.get("/v1/users/search", response_model=List[UserResponse])
-def search_users(
+async def search_users(
         name: Optional[str] = Query(None, description="Search by name (partial match)"),
         surname: Optional[str] = Query(None, description="Search by surname (partial match)"),
         email: Optional[str] = Query(None, description="Search by email (partial match)"),
@@ -276,8 +278,6 @@ def search_users(
         date_of_birth: Optional[datetime.date] = Query(None, description="Search by exact date of birth"),
         date_of_birth_from: Optional[datetime.date] = Query(None, description="Search for users born after this date (inclusive)"),
         date_of_birth_to: Optional[datetime.date] = Query(None, description="Search for users born before this date (inclusive)"),
-        limit: int = Query(100, ge=1, le=1000, description="Maximum number of results to return"),
-        offset: int = Query(0, ge=0, description="Number of results to skip"),
         db: Session = Depends(get_db)
 ):
     """
@@ -287,19 +287,14 @@ def search_users(
     Gender must be an exact match.
     Date of birth can be searched by exact date or date range.
     """
-
-    # Validate gender if provided
     if gender and gender.lower() not in ['male', 'female', 'other']:
         raise HTTPException(status_code=400, detail="Gender must be 'male', 'female', or 'other'")
 
-    # Validate date range
     if date_of_birth_from and date_of_birth_to and date_of_birth_from > date_of_birth_to:
         raise HTTPException(status_code=400, detail="date_of_birth_from cannot be later than date_of_birth_to")
 
-    # Build query with filters
     query = db.query(User)
 
-    # Text-based filters (case-insensitive partial matching)
     if name:
         query = query.filter(User.name.ilike(f"%{name}%"))
 
@@ -309,26 +304,20 @@ def search_users(
     if email:
         query = query.filter(User.email.ilike(f"%{email}%"))
 
-    # Exact gender match
     if gender:
         query = query.filter(User.gender == gender.lower())
 
-    # Date of birth filters
     if date_of_birth:
-        # Exact date match
         query = query.filter(User.date_of_birth == date_of_birth)
     else:
-        # Date range filters
         if date_of_birth_from:
             query = query.filter(User.date_of_birth >= date_of_birth_from)
 
         if date_of_birth_to:
             query = query.filter(User.date_of_birth <= date_of_birth_to)
 
-    # Apply pagination
-    users = query.offset(offset).limit(limit).all()
+    users = query.all()
 
-    # Get detailed user information
     result = []
     for user in users:
         user_details = get_user_with_details(db, user.id)
@@ -338,7 +327,7 @@ def search_users(
     return result
 
 @app.get("/v1/users", response_model=List[UserResponse])
-def get_all_users(db: Session = Depends(get_db)):
+async def get_all_users(db: Session = Depends(get_db)):
     """Get all users"""
     users = db.query(User).all()
     result = []
@@ -351,7 +340,7 @@ def get_all_users(db: Session = Depends(get_db)):
     return result
 
 @app.get("/v1/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: Session = Depends(get_db)):
+async def get_user(user_id: int, db: Session = Depends(get_db)):
     """Get user by ID"""
     user_details = get_user_with_details(db, user_id)
 
@@ -361,7 +350,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     return user_details
 
 @app.post("/v1/users", response_model=UserResponse, status_code=201)
-def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
+async def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     """Create a new user"""
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
@@ -375,7 +364,8 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
         date_of_birth=user_data.date_of_birth,
         gender=user_data.gender,
         company=user_data.company,
-        salary=user_data.salary
+        salary=user_data.salary,
+        about_me=user_data.about_me
     )
     db.add(db_user)
     db.flush()
@@ -402,7 +392,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     return get_user_with_details(db, db_user.id)
 
 @app.put("/v1/users/{user_id}", response_model=UserResponse)
-def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
+async def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_db)):
     """Update user by ID"""
     db_user = db.query(User).filter(User.id == user_id).first()
     if not db_user:
@@ -448,7 +438,7 @@ def update_user(user_id: int, user_data: UserUpdate, db: Session = Depends(get_d
     return get_user_with_details(db, user_id)
 
 @app.delete("/v1/users/{user_id}", status_code=204)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+async def delete_user(user_id: int, db: Session = Depends(get_db)):
     """Delete user by ID"""
     db_user = db.query(User).filter(User.id == user_id).first()
     if not db_user:
@@ -465,32 +455,6 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "timestamp": datetime.datetime.utcnow()}
-
-@app.get("/stats")
-def get_stats(db: Session = Depends(get_db)):
-    """Get database statistics"""
-    total_users = db.query(User).count()
-    total_addresses = db.query(Address).count()
-    total_credit_cards = db.query(CreditCard).count()
-
-    # Get some additional stats
-    users_with_company = db.query(User).filter(User.company.isnot(None)).count()
-    male_users = db.query(User).filter(User.gender == 'male').count()
-    female_users = db.query(User).filter(User.gender == 'female').count()
-    other_users = db.query(User).filter(User.gender == 'other').count()
-
-    return {
-        "total_users": total_users,
-        "total_addresses": total_addresses,
-        "total_credit_cards": total_credit_cards,
-        "users_with_company": users_with_company,
-        "gender_distribution": {
-            "male": male_users,
-            "female": female_users,
-            "other": other_users
-        },
-        "timestamp": datetime.datetime.utcnow()
-    }
 
 if __name__ == "__main__":
     import uvicorn

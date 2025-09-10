@@ -2,9 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ARG USERS_NUMBER=1000
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
+    PYTHONPATH=/app \
+    USERS_NUMBER=${USERS_NUMBER}
 
 RUN apt-get update && apt-get install -y \
     gcc \
