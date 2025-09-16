@@ -7,7 +7,7 @@ from models import User, Address, CreditCard, SessionLocal
 
 fake = Faker()
 
-def generate_about_me(gender, company=None):
+def generate_about_me(company=None):
     """Generate a personalized 'about me' description"""
 
     hobbies = [
@@ -235,7 +235,7 @@ def generate_user_data():
     else:
         company = None
         salary = None
-    about_me = generate_about_me(gender, company)
+    about_me = generate_about_me(company)
 
     return {
         "name": first_name,

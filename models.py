@@ -1,14 +1,17 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Date
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
+import logging
 
 DATABASE_URL = "sqlite:///./users.db"
+
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
-    echo=True
+    echo=False
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -40,12 +43,12 @@ class User(Base):
     name = Column(String(100), nullable=False)
     surname = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
-    phone = Column(String(20), nullable=False)
-    gender = Column(String(10), nullable=False)
-    date_of_birth = Column(Date, nullable=False)
+    phone = Column(String(20), nullable=True)
+    gender = Column(String(10), nullable=True)
+    date_of_birth = Column(String(20), nullable=True)
     company = Column(String(200), nullable=True)
     salary = Column(Float, nullable=True)
-    about_me = Column(Text, nullable=True)
+    about_me = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
