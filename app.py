@@ -16,11 +16,9 @@ from sqlalchemy.orm import Session
 from generate_users import generate_test_users, generate_user_data, create_user_in_db
 from models import SessionLocal, User, Address, CreditCard
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Disable SQLAlchemy logging
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
 
 DATABASE_URL = "sqlite:///./users.db"
@@ -28,7 +26,7 @@ DATABASE_URL = "sqlite:///./users.db"
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
-    echo=False  # Disable SQL query logging
+    echo=False
 )
 
 scheduler = AsyncIOScheduler()
@@ -41,8 +39,9 @@ def initialize_users():
         user_count = db.query(User).count()
         if user_count == 0:
             logger.info("Database is empty, generating initial test users...")
-            generate_test_users(int(os.getenv('USERS_NUMBER', 100)))
-            logger.info(f"Successfully initialized {os.getenv('USERS_NUMBER', 100)} test users")
+            users_num = int(os.getenv('USERS_NUMBER', 1000))
+            generate_test_users(users_num)
+            logger.info(f"Successfully initialized {os.getenv('USERS_NUMBER', users_num)} test users")
         else:
             logger.info(f"Database already contains {user_count} users, skipping initialization")
     finally:
@@ -479,4 +478,4 @@ if __name__ == "__main__":
     import uvicorn
 
     print("Starting server...")
-    uvicorn.run(app, host="0.0.0.0", port=8041)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
